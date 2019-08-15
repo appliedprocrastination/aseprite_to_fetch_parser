@@ -5,62 +5,65 @@ import struct
 import zlib
 import copy as cp
 
-def aseprite_to_numpy(file_path, scale_from=1, scale_to=1):
-    animation = []
+np.set_printoptions(edgeitems=3,infstr='inf',
+                    linewidth=75, nanstr='nan', precision=8,
+                    suppress=False, threshold=1000, formatter=None)
+
+def aseprite_to_numpy(file_path):
+    # Read file using py_aseprite
     with open(file_path, "rb") as f:
         a = f.read()
         parsed_file = AsepriteFile(a)
         frames = parsed_file.frames
         header = parsed_file.header
 
-        layers = parsed_file.layers
-        layer_tree = parsed_file.layer_tree
-        
-        for i, frame in enumerate(frames): 
-            """
-            print("Frame", i)
-            for chunk in frame.chunks:
-                #print(chunk.chunk_index)
-                print(hex(chunk.chunk_type))
-                if chunk.chunk_type == 0x2005:
-                    #print(chunk.flags)
-                    #print(chunk.layer_type)
-                    #print(chunk.layer_child_level)
-                    #print(chunk.default_width)
-                    #print(chunk.default_height)
-                    #print(chunk.blend_mode)
-                    #print(chunk.opacity)
-                    print(binascii.hexlify(chunk.data["data"]))
-                    print()
-                print()
-            """
-            for chunk in frame.chunks:
-                #print(hex(chunk.chunk_type))
-                if chunk.chunk_type == 0x2005:
-                    #print(i, chunk.layer_index)
-                    #if chunk.layer_index == 1:
-                    frame = np.zeros((int(chunk.data["width"]), int(chunk.data["height"])), dtype="uint8")
-                    data = binascii.hexlify(chunk.data["data"])#chunk.data["data"]
-                    #print(data)
-                    cnt_x = 0
-                    cnt_y = 0
-                    for i in range(int(chunk.data["width"]) * int(chunk.data["height"])):
-                        val = data[i*4:i*4+4]
+    #Check sice of color values
+    if header.color_depth == 8:
+        color_size = 2
+    elif header.color_depth == 16:
+        color_size = 4
+    else:
+        raise ValueError("Unknown color depth: {}".format(header.color_depth))
+
+    #Check if there are used multiple layers
+    if frames[0].num_chunks == 4:
+        layers = False
+    elif frames[0].num_chunks == 6:
+        layers = True
+    else:
+        raise ValueError("Unkonwn number of chunks in first frame: {}".format(frames[0].num_chunks))
+    
+    width, height = header.width, header.height
+    animation = []
+    for i, frame in enumerate(frames):
+        for chunk in frame.chunks:
+            # Only insterested in the chunks containing the data
+            if chunk.chunk_type == 0x2005:
+                # Make sure to use the right layer index dependent on wether multiple layers are used or not
+                if (layers and chunk.layer_index == 1) or (not layers and chunk.layer_index == 0):
+                    chunk_width, chunk_height = int(chunk.data["width"]), int(chunk.data["height"])
+                    frame = np.zeros((width, height), dtype="uint8")
+                    data = binascii.hexlify(chunk.data["data"])
+                    cnt_x = chunk.x_pos
+                    cnt_y = chunk.y_pos
+                    for i in range(chunk_width * chunk_height):
+                        #Wors way ever to convert from byres to int...
+                        val = data[i*color_size:i*color_size+color_size]
                         val = val[0:2]
                         val_str = "{}".format(val)[1:]
                         val_int = int(val, 16)
-                        val_int = round((255 - val_int)*scale_to/scale_from)
+                        #If grayscale are used, flip the scale
+                        if color_size == 4:
+                            val_int = 255 - val_int
                         frame[cnt_x, cnt_y] = val_int
                         cnt_x += 1
-                        if cnt_x == chunk.data["width"]:
-                            cnt_x  = 0
+                        if cnt_x == chunk_width + chunk.x_pos:
+                            cnt_x  = chunk.x_pos
                             cnt_y += 1
                     animation.append(frame)
-            
     return animation
 
-def numpy_to_fetch(animation, outfile="out"):
-    #global num_frames, num_x, num_y, animation
+def numpy_to_fetch(animation, outfile="out", scale_from=1, scale_to=1):
     num_frames = len(animation)
     num_x, num_y = animation[0].shape
     pwm_frames = []
@@ -76,7 +79,7 @@ def numpy_to_fetch(animation, outfile="out"):
             binary_frame_array_uint32 = np.uint32(binary_frame_array.astype(int))
     
             frame[frame == 0] = 20
-            pwm_frame_uint8 = np.uint8(frame)
+            pwm_frame_uint8 = np.uint8(frame) * scale_to / scale_from
             
             fp.write(bytes(binary_frame_array_uint32))
             pwm_frames.append(pwm_frame_uint8)
