@@ -1,10 +1,11 @@
 from aseprite import AsepriteFile
 import numpy as np
+import copy as cp
 import binascii
 import struct
 import zlib
-import copy as cp
 
+#Just for more suitable formating when printing the numpy arrays
 np.set_printoptions(edgeitems=3,infstr='inf',
                     linewidth=75, nanstr='nan', precision=8,
                     suppress=False, threshold=1000, formatter=None)
@@ -69,16 +70,23 @@ def numpy_to_fetch(animation, outfile="out", scale_from=1, scale_to=1):
     pwm_frames = []
     with open("{}.bin".format(outfile), "wb") as fp:
         for i in range(num_frames):
+            #Dont want to change original frame, better safe then sorry
             frame = cp.deepcopy(animation[i])
+
+            #Turn the matrix the rigt way
             frame = frame.transpose()
             frame = np.flip(frame, 0)
+
+            #Convet every row to a 32 bit number
             binary_factors = 2**np.linspace(0,num_y, num_y+1)[0:-1]
-    
             binary_frame_matrix = (frame > 0)
             binary_frame_array = np.sum(binary_frame_matrix * binary_factors.reshape(-1,1), 0)
             binary_frame_array_uint32 = np.uint32(binary_frame_array.astype(int))
     
+            #Sets every zero to 20 as the unactive magnets should have a even state
             frame[frame == 0] = 20
+
+            #If svaling are set, this will take care of it
             pwm_frame_uint8 = np.uint8(frame) * scale_to / scale_from
             
             fp.write(bytes(binary_frame_array_uint32))
@@ -87,6 +95,7 @@ def numpy_to_fetch(animation, outfile="out", scale_from=1, scale_to=1):
         for pwm_frame in pwm_frames:
             fp.write(bytes(pwm_frame))
 
+    #Creates the config file
     with open("{}.txt".format(outfile), "w") as fp:
         fp.write("{},{},{},0,0,1,0,-1,0,-1,0".format(num_x, num_y, num_frames))
 
