@@ -71,12 +71,11 @@ def aseprite_to_numpy(file_path):
         if new_frame:   
             animation.append(frame)
             new_frame = False
+            
     for i, a in enumerate(animation):
         print("Frame:",i)
-        print(a)
+        #print(a.transpose())
         print()
-        #print(np.flip(a.transpose()))
-        #print()
     print(len(frames))
     print(len(animation))
     
