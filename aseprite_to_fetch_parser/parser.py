@@ -39,11 +39,11 @@ def aseprite_to_numpy(file_path):
     new_frame = False
     frame = None
     for i, frame in enumerate(frames):
-        print("Frame:",i)
+        #print("Frame:",i)
         for chunk in frame.chunks:
             # Only insterested in the chunks containing the data
             if chunk.chunk_type == 0x2005:
-                print("Data Chunck!")
+                #print("Data Chunck!")
                 # Make sure to use the right layer index dependent on wether multiple layers are used or not
                 if (layers and chunk.layer_index) or (not layers and chunk.layer_index == 0):
                     if not new_frame:
@@ -71,14 +71,6 @@ def aseprite_to_numpy(file_path):
         if new_frame:   
             animation.append(frame)
             new_frame = False
-            
-    for i, a in enumerate(animation):
-        print("Frame:",i)
-        #print(a.transpose())
-        print()
-    print(len(frames))
-    print(len(animation))
-    
 
     return animation
 
@@ -118,6 +110,7 @@ def numpy_to_fetch(animation, outfile="out", scale_from=1, scale_to=1):
         fp.write("{},{},{},0,0,1,0,-1,0,-1,0".format(num_x, num_y, num_frames))
 
 if __name__ == "__main__":
+    """
     import argparse
 
     parser = argparse.ArgumentParser(description='Converts the aseprite file format to Fetch readable binary animation file.')
@@ -127,3 +120,15 @@ if __name__ == "__main__":
     else:
         animation_np = aseprite_to_numpy(sys.argv[1])
         numpy_to_fetch(animation_np, outfile="/run/media/alphaos/3333-3438/"+sys.argv[2])
+    """
+    import glob
+    import re
+    import os
+    hard_coded_relative_path = "/home/*/Documents/aseprite_to_fetch_parser/fetch_animations/"
+    list_of_files = glob.glob(hard_coded_relative_path + '*')
+    latest_file = max(list_of_files, key=os.path.getctime)
+    hard_coded_relative_path = re.findall(r"(.*fetch_animations/)", latest_file)[0]
+    animation_np = aseprite_to_numpy(latest_file)
+    file_name = re.findall(r"fetch_animations/(.*)\.aseprite", latest_file)[0]
+    print(file_name)
+    numpy_to_fetch(animation_np, outfile=hard_coded_relative_path + file_name)
