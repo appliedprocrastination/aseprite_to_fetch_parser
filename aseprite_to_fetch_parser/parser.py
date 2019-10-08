@@ -1,8 +1,12 @@
 from aseprite import AsepriteFile
+
+import matplotlib.animation as plt_animation
+import matplotlib.pyplot as plt
 import numpy as np
 import copy as cp
 import binascii
 import struct
+import time
 import zlib
 
 #Just for more suitable formating when printing the numpy arrays
@@ -109,9 +113,39 @@ def numpy_to_fetch(animation, outfile="out", scale_from=1, scale_to=1):
     with open("{}_C.txt".format(outfile), "w") as fp:
         fp.write("{},{},{},0,0,1,0,-1,0,-1,0".format(num_x, num_y, num_frames))
 
+
+def motion_blur(animation, upsampling=4, fade_min=8, max_value=20):
+    out_animation = []
+    for idx in range(len(animation)-1):
+        current_frame = np.copy(animation[idx])
+
+        next_frame = np.copy(animation[idx+1])
+
+        fading_idx = np.logical_xor(np.logical_and(current_frame, next_frame), current_frame)
+        out_animation.append(current_frame)
+        if np.sum(fading_idx):
+            for i in range(1, upsampling):
+                fade_frame = np.copy(current_frame)
+                fade_value = max_value - np.round((max_value - fade_min) / (upsampling - 1) * i) 
+                fade_frame[fading_idx] = fade_value
+                out_animation.append(fade_frame)
+
+    return out_animation
+
+def show_animation(animation, fps=4):
+    fig, ax = plt.subplots(1,1)
+    img_animation = []
+    for a in animation:
+        img = ax.imshow(a.transpose(), aspect='equal', vmax=20, vmin=0, cmap=plt.get_cmap("Greys"))
+        ax.grid(True)
+        img_animation.append([img])
+    anim = plt_animation.ArtistAnimation(fig, img_animation, interval=round(1000/fps), blit=True)
+    plt.show()
+
 if __name__ == "__main__":
-    """
+    
     import argparse
+    import os
 
     parser = argparse.ArgumentParser(description='Converts the aseprite file format to Fetch readable binary animation file.')
     import sys
@@ -119,7 +153,10 @@ if __name__ == "__main__":
         print("No file ...")
     else:
         animation_np = aseprite_to_numpy(sys.argv[1])
-        numpy_to_fetch(animation_np, outfile="/run/media/alphaos/3333-3438/"+sys.argv[2])
+        animation_np_mb = motion_blur(animation_np)
+        numpy_to_fetch(animation_np_mb, outfile="/run/media/alphaos/3333-3438/"+sys.argv[2]) #outfile="/run/media/alphaos/3333-3438/"+
+        os.system("umount /dev/mmcblk0p1")
+    
     """
     import glob
     import re
@@ -132,3 +169,4 @@ if __name__ == "__main__":
     file_name = re.findall(r"fetch_animations/(.*)\.aseprite", latest_file)[0]
     print(file_name)
     numpy_to_fetch(animation_np, outfile=hard_coded_relative_path + file_name)
+    """
