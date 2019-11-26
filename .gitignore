@@ -1,3 +1,7 @@
 *.txt
 *.bin
 *.aseprite
+__pycache__
+.vscode
+py_aseprite-master/build
+skaperfestivalen_animations
