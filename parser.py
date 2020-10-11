@@ -96,13 +96,14 @@ def numpy_to_fetch(animation, outfile="out", scale_from=1, scale_to=1):
             binary_frame_array_uint32 = np.uint32(binary_frame_array.astype(int))
     
             #Sets every zero to 20 as the unactive magnets should have a even state
-            frame[frame == 0] = 20
+            #frame[frame == 0] = 20
 
+            frame = (frame / np.max(frame)) * 4096
             #If svaling are set, this will take care of it
-            pwm_frame_uint8 = np.uint8(frame)# * scale_to / scale_from
+            pwm_frame_uint16 = np.uint16(frame)# * scale_to / scale_from
             
-            fp.write(bytes(binary_frame_array_uint32))
-            pwm_frames.append(pwm_frame_uint8)
+            #fp.write(bytes(binary_frame_array_uint32))
+            pwm_frames.append(pwm_frame_uint16)
     
         for pwm_frame in pwm_frames:
             fp.write(bytes(pwm_frame))
